@@ -29,6 +29,10 @@ func main() {
 	// Setup Gin router
 	r := gin.Default()
 
+	// Trust only the proxy (Render uses reverse proxy)
+	// Set to nil to not trust any proxy, or specific IPs for your proxy
+	r.SetTrustedProxies(nil)
+
 	// CORS configuration for React frontend
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173", "http://localhost:3000", "https://*dec-filesharer.vercel.app"},
