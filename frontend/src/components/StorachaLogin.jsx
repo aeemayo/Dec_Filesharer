@@ -1,28 +1,30 @@
 import { useState, useEffect } from 'react'
-import { FiUser, FiCheck, FiLoader, FiMail, FiLogOut, FiCloud, FiSettings } from 'react-icons/fi'
+import { FiUser, FiLoader, FiMail, FiCloud, FiLock } from 'react-icons/fi'
 import storachaService from '../services/storacha'
 import './StorachaLogin.css'
 
-function StorachaLogin() {
+function StorachaLogin({ onStatusChange }) {
   const [email, setEmail] = useState('')
-  const [status, setStatus] = useState('checking') // 'checking', 'disconnected', 'awaiting-verification', 'connected', 'configured'
+  const [status, setStatus] = useState('checking') // 'checking', 'disconnected', 'awaiting-verification', 'connected'
   const [isLoading, setIsLoading] = useState(false)
   const [spaceDid, setSpaceDid] = useState(null)
-  const [isConfigured, setIsConfigured] = useState(false)
 
   useEffect(() => {
     checkConnection()
   }, [])
 
+  useEffect(() => {
+    // Notify parent component of status changes
+    onStatusChange?.(status === 'connected')
+  }, [status, onStatusChange])
+
   const checkConnection = async () => {
     setStatus('checking')
     try {
       await storachaService.initialize()
-      const configured = storachaService.isUsingConfiguredSpace()
-      setIsConfigured(configured)
       
       if (storachaService.canUploadDirectly()) {
-        setStatus(configured ? 'configured' : 'connected')
+        setStatus('connected')
         const did = storachaService.getCurrentSpaceDid()
         if (did) {
           setSpaceDid(did)
@@ -78,26 +80,6 @@ function StorachaLogin() {
     )
   }
 
-  // Pre-configured space via environment variables
-  if (status === 'configured') {
-    return (
-      <div className="storacha-login card">
-        <div className="login-status configured">
-          <FiSettings className="status-icon configured" />
-          <div className="connection-info">
-            <span className="status-text">Pre-configured Space</span>
-            {spaceDid && (
-              <span className="space-did" title={spaceDid}>
-                Space: {truncateDid(spaceDid)}
-              </span>
-            )}
-          </div>
-          <span className="badge badge-configured">Direct IPFS Upload</span>
-        </div>
-      </div>
-    )
-  }
-
   if (status === 'connected') {
     return (
       <div className="storacha-login card">
@@ -135,10 +117,10 @@ function StorachaLogin() {
   return (
     <div className="storacha-login card">
       <div className="login-header">
-        <FiCloud className="header-icon" />
+        <FiLock className="header-icon" />
         <div>
-          <h3>Connect to Storacha</h3>
-          <p>Enable direct IPFS uploads from your browser</p>
+          <h3>Sign in to Upload</h3>
+          <p>Connect with your email to upload files to IPFS</p>
         </div>
       </div>
       
@@ -163,14 +145,14 @@ function StorachaLogin() {
           ) : (
             <>
               <FiUser />
-              Connect with Email
+              Sign in with Email
             </>
           )}
         </button>
       </form>
       
       <p className="login-note">
-        Without login, files upload via the server (may be slower)
+        You'll receive a verification link. Free account includes 5GB storage.
       </p>
     </div>
   )

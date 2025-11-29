@@ -17,6 +17,7 @@ function App() {
   const [shareLinks, setShareLinks] = useState([])
   const [loading, setLoading] = useState(true)
   const [notification, setNotification] = useState(null)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   // Fetch files on mount
   useEffect(() => {
@@ -127,8 +128,14 @@ function App() {
 
       <main className="app-main">
         <section className="upload-section">
-          <StorachaLogin />
-          <FileUpload onUploadComplete={handleUploadComplete} />
+          <StorachaLogin onStatusChange={setIsLoggedIn} />
+          {isLoggedIn ? (
+            <FileUpload onUploadComplete={handleUploadComplete} />
+          ) : (
+            <div className="card upload-disabled">
+              <p>👆 Sign in above to upload files</p>
+            </div>
+          )}
         </section>
 
         <div className="content-grid">

@@ -27,6 +27,18 @@
   margin-bottom: 2rem;
 }
 
+.upload-disabled {
+  text-align: center;
+  padding: 2rem;
+  color: rgba(255, 255, 255, 0.5);
+  border: 2px dashed rgba(255, 255, 255, 0.1);
+}
+
+.upload-disabled p {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
 .content-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

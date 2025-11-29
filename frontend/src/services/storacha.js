@@ -2,25 +2,15 @@
  * Storacha/w3up client service for decentralized file uploads
  * 
  * This module integrates with the @storacha/client for direct browser-to-IPFS uploads
- * Files are uploaded directly to Storacha network, then registered with our backend.
- * 
- * Configuration via environment variables:
- * - VITE_STORACHA_SPACE_DID: The DID of your Storacha space (did:key:...)
- * - VITE_STORACHA_PROOF: Base64-encoded proof/delegation for the space
+ * Users must sign in with their email to upload files.
  */
 
 import * as Client from '@storacha/client'
-import * as Proof from '@storacha/client/proof'
-import { Signer } from '@storacha/client/principal/ed25519'
 
 // Use environment variable for API URL, fallback to /api for local dev
 const API_BASE = import.meta.env.VITE_API_URL 
   ? `${import.meta.env.VITE_API_URL}/api`
   : '/api'
-
-// Storacha space configuration from environment
-const STORACHA_SPACE_DID = import.meta.env.VITE_STORACHA_SPACE_DID
-const STORACHA_PROOF = import.meta.env.VITE_STORACHA_PROOF
 
 /**
  * StorachaService handles direct uploads to Storacha network
@@ -59,29 +49,7 @@ class StorachaService {
       // Create a new client (this creates a new agent)
       this.client = await Client.create()
       
-      // Priority 1: Check for pre-configured space via environment variables
-      if (STORACHA_SPACE_DID && STORACHA_PROOF) {
-        try {
-          console.log('Using configured Storacha space:', STORACHA_SPACE_DID)
-          
-          // Parse the base64-encoded proof
-          const proofBytes = Uint8Array.from(atob(STORACHA_PROOF), c => c.charCodeAt(0))
-          const proof = await Proof.parse(proofBytes)
-          
-          // Add the space with the proof
-          const space = await this.client.addSpace(proof)
-          await this.client.setCurrentSpace(space.did())
-          
-          this.initialized = true
-          console.log('Storacha client initialized with configured space')
-          return
-        } catch (e) {
-          console.error('Failed to use configured space:', e)
-          // Fall through to other methods
-        }
-      }
-      
-      // Priority 2: Check if we already have a space from localStorage
+      // Check if we already have a space from previous login (stored in localStorage)
       const spaces = this.client.spaces()
       if (spaces.length > 0) {
         await this.client.setCurrentSpace(spaces[0].did())
@@ -90,27 +58,11 @@ class StorachaService {
         return
       }
 
-      // Priority 3: Try to get delegation from backend if available
-      try {
-        const delegation = await this.fetchDelegationFromBackend()
-        if (delegation) {
-          const space = await this.client.addSpace(delegation)
-          await this.client.setCurrentSpace(space.did())
-          this.initialized = true
-          console.log('Storacha client initialized with backend delegation')
-          return
-        }
-      } catch (e) {
-        console.log('No backend delegation available, will use login flow')
-      }
-
-      // If no space and no delegation, client needs to login
-      // For now, mark as initialized but uploads will go through backend
+      // No space - user needs to login with email
       this.initialized = true
-      console.log('Storacha client initialized (no space - will use backend uploads)')
+      console.log('Storacha client initialized (no space - login required)')
     } catch (error) {
       console.error('Failed to initialize Storacha client:', error)
-      // Don't throw - we'll fall back to backend uploads
       this.initialized = true
     }
   }
@@ -127,32 +79,6 @@ class StorachaService {
    */
   getCurrentSpaceDid() {
     return this.client?.currentSpace()?.did() || null
-  }
-
-  /**
-   * Check if using a pre-configured space
-   */
-  isUsingConfiguredSpace() {
-    return !!(STORACHA_SPACE_DID && STORACHA_PROOF)
-  }
-
-  /**
-   * Fetch a UCAN delegation from the backend
-   * @returns {Promise<Delegation|null>} - The delegation or null
-   */
-  async fetchDelegationFromBackend() {
-    if (!this.client) return null
-    
-    const did = this.client.agent.did()
-    const response = await fetch(`${API_BASE}/delegation/${encodeURIComponent(did)}`)
-    
-    if (!response.ok) {
-      return null
-    }
-    
-    const data = await response.arrayBuffer()
-    const delegation = await Proof.parse(new Uint8Array(data))
-    return delegation
   }
 
   /**
@@ -203,41 +129,35 @@ class StorachaService {
   async uploadFile(file, onProgress) {
     await this.initialize()
 
-    // If we can upload directly, do so
-    if (this.canUploadDirectly()) {
-      try {
-        onProgress?.({ type: 'start', name: file.name })
-        
-        const cid = await this.client.uploadFile(file, {
-          onShardStored: (meta) => {
-            onProgress?.({ type: 'shard', cid: meta.cid.toString(), size: meta.size })
-          }
-        })
-
-        const cidString = cid.toString()
-        
-        // Register the file with our backend
-        const registered = await this.registerFileWithBackend({
-          name: file.name,
-          size: file.size,
-          contentType: file.type || 'application/octet-stream',
-          cid: cidString
-        })
-
-        onProgress?.({ type: 'complete', cid: cidString })
-        
-        return {
-          files: [registered.file],
-          message: 'Successfully uploaded 1 file'
-        }
-      } catch (error) {
-        console.error('Direct upload failed, falling back to backend:', error)
-        // Fall through to backend upload
-      }
+    // Require login to upload
+    if (!this.canUploadDirectly()) {
+      throw new Error('Please sign in with your email to upload files')
     }
 
-    // Fallback: use backend upload
-    return this.uploadViaBackend([file], onProgress)
+    onProgress?.({ type: 'start', name: file.name })
+    
+    const cid = await this.client.uploadFile(file, {
+      onShardStored: (meta) => {
+        onProgress?.({ type: 'shard', cid: meta.cid.toString(), size: meta.size })
+      }
+    })
+
+    const cidString = cid.toString()
+    
+    // Register the file with our backend
+    const registered = await this.registerFileWithBackend({
+      name: file.name,
+      size: file.size,
+      contentType: file.type || 'application/octet-stream',
+      cid: cidString
+    })
+
+    onProgress?.({ type: 'complete', cid: cidString })
+    
+    return {
+      files: [registered.file],
+      message: 'Successfully uploaded 1 file'
+    }
   }
 
   /**
@@ -249,49 +169,43 @@ class StorachaService {
   async uploadFiles(files, onProgress) {
     await this.initialize()
 
-    // If we can upload directly, upload each file
-    if (this.canUploadDirectly()) {
-      try {
-        const uploadedFiles = []
-        
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i]
-          onProgress?.({ type: 'start', name: file.name, index: i, total: files.length })
-          
-          const cid = await this.client.uploadFile(file, {
-            onShardStored: (meta) => {
-              onProgress?.({ type: 'shard', cid: meta.cid.toString(), size: meta.size })
-            }
-          })
-
-          const cidString = cid.toString()
-          
-          // Register each file with backend
-          const registered = await this.registerFileWithBackend({
-            name: file.name,
-            size: file.size,
-            contentType: file.type || 'application/octet-stream',
-            cid: cidString
-          })
-
-          uploadedFiles.push(registered.file)
-          onProgress?.({ type: 'fileComplete', name: file.name, cid: cidString, index: i })
-        }
-
-        onProgress?.({ type: 'complete', count: uploadedFiles.length })
-        
-        return {
-          files: uploadedFiles,
-          message: `Successfully uploaded ${uploadedFiles.length} file(s)`
-        }
-      } catch (error) {
-        console.error('Direct upload failed, falling back to backend:', error)
-        // Fall through to backend upload
-      }
+    // Require login to upload
+    if (!this.canUploadDirectly()) {
+      throw new Error('Please sign in with your email to upload files')
     }
 
-    // Fallback: use backend upload
-    return this.uploadViaBackend(files, onProgress)
+    const uploadedFiles = []
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      onProgress?.({ type: 'start', name: file.name, index: i, total: files.length })
+      
+      const cid = await this.client.uploadFile(file, {
+        onShardStored: (meta) => {
+          onProgress?.({ type: 'shard', cid: meta.cid.toString(), size: meta.size })
+        }
+      })
+
+      const cidString = cid.toString()
+      
+      // Register each file with backend
+      const registered = await this.registerFileWithBackend({
+        name: file.name,
+        size: file.size,
+        contentType: file.type || 'application/octet-stream',
+        cid: cidString
+      })
+
+      uploadedFiles.push(registered.file)
+      onProgress?.({ type: 'fileComplete', name: file.name, cid: cidString, index: i })
+    }
+
+    onProgress?.({ type: 'complete', count: uploadedFiles.length })
+    
+    return {
+      files: uploadedFiles,
+      message: `Successfully uploaded ${uploadedFiles.length} file(s)`
+    }
   }
 
   /**
@@ -312,35 +226,6 @@ class StorachaService {
     }
 
     return await response.json()
-  }
-
-  /**
-   * Fallback: Upload files via backend (when direct upload isn't available)
-   * @param {File[]} files - Files to upload
-   * @param {Function} onProgress - Progress callback
-   * @returns {Promise<Object>} - Upload result
-   */
-  async uploadViaBackend(files, onProgress) {
-    const formData = new FormData()
-    files.forEach(file => {
-      formData.append('files', file)
-    })
-
-    onProgress?.({ type: 'uploading', method: 'backend' })
-
-    const response = await fetch(`${API_BASE}/upload`, {
-      method: 'POST',
-      body: formData,
-    })
-
-    if (!response.ok) {
-      throw new Error('Upload failed')
-    }
-
-    const result = await response.json()
-    onProgress?.({ type: 'complete', count: result.files?.length || 0 })
-    
-    return result
   }
 
   /**
