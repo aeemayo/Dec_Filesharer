@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FiUser, FiLoader, FiMail, FiCloud, FiLock } from 'react-icons/fi'
+import { FiUser, FiLoader, FiMail, FiCloud, FiLock, FiLogOut } from 'react-icons/fi'
 import storachaService from '../services/storacha'
 import './StorachaLogin.css'
 
@@ -69,6 +69,38 @@ function StorachaLogin({ onStatusChange }) {
     return `${did.slice(0, 16)}...${did.slice(-8)}`
   }
 
+  const handleLogout = async () => {
+    // Clear all Storacha-related data from localStorage
+    const keysToRemove = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && (key.includes('w3up') || key.includes('storacha') || key.includes('ucanto'))) {
+        keysToRemove.push(key)
+      }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key))
+    
+    // Also try clearing IndexedDB for @storacha/client
+    try {
+      const databases = await indexedDB.databases()
+      for (const db of databases) {
+        if (db.name && (db.name.includes('w3up') || db.name.includes('storacha'))) {
+          indexedDB.deleteDatabase(db.name)
+        }
+      }
+    } catch (e) {
+      console.log('Could not clear IndexedDB:', e)
+    }
+    
+    // Reset service state
+    storachaService.client = null
+    storachaService.initialized = false
+    
+    // Update UI
+    setSpaceDid(null)
+    setStatus('disconnected')
+  }
+
   if (status === 'checking') {
     return (
       <div className="storacha-login card">
@@ -93,7 +125,12 @@ function StorachaLogin({ onStatusChange }) {
               </span>
             )}
           </div>
-          <span className="badge badge-success">Direct IPFS Upload</span>
+          <div className="connected-actions">
+            <span className="badge badge-success">Ready to Upload</span>
+            <button onClick={handleLogout} className="btn-logout" title="Sign out">
+              <FiLogOut />
+            </button>
+          </div>
         </div>
       </div>
     )
