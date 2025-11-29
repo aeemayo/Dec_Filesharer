@@ -5,6 +5,11 @@ import FilePreview from './components/FilePreview'
 import ShareLinkManager from './components/ShareLinkManager'
 import './App.css'
 
+// API base URL - uses env variable in production, proxy in development
+const API_BASE = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : '/api'
+
 function App() {
   const [files, setFiles] = useState([])
   const [selectedFile, setSelectedFile] = useState(null)
@@ -19,7 +24,7 @@ function App() {
 
   const fetchFiles = async () => {
     try {
-      const response = await fetch('/api/files')
+      const response = await fetch(`${API_BASE}/files`)
       const data = await response.json()
       setFiles(data.files || [])
     } catch (error) {
@@ -39,7 +44,7 @@ function App() {
     setSelectedFile(file)
     // Fetch share links for this file
     try {
-      const response = await fetch(`/api/files/${file.id}`)
+      const response = await fetch(`${API_BASE}/files/${file.id}`)
       const data = await response.json()
       setShareLinks(data.shareLinks || [])
     } catch (error) {
@@ -49,7 +54,7 @@ function App() {
 
   const handleDeleteFile = async (fileId) => {
     try {
-      const response = await fetch(`/api/files/${fileId}`, { method: 'DELETE' })
+      const response = await fetch(`${API_BASE}/files/${fileId}`, { method: 'DELETE' })
       if (response.ok) {
         setFiles(prev => prev.filter(f => f.id !== fileId))
         if (selectedFile?.id === fileId) {
@@ -66,7 +71,7 @@ function App() {
 
   const handleCreateShareLink = async (fileId, options) => {
     try {
-      const response = await fetch(`/api/files/${fileId}/share`, {
+      const response = await fetch(`${API_BASE}/files/${fileId}/share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(options),
@@ -84,7 +89,7 @@ function App() {
 
   const handleRevokeShareLink = async (token) => {
     try {
-      const response = await fetch(`/api/share/${token}`, { method: 'DELETE' })
+      const response = await fetch(`${API_BASE}/share/${token}`, { method: 'DELETE' })
       if (response.ok) {
         setShareLinks(prev => 
           prev.map(link => 

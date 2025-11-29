@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: dec-filesharer-api
+    runtime: go
+    buildCommand: go build -o dec-filesharer .
+    startCommand: ./dec-filesharer
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: IPFS_GATEWAY
+        value: https://w3s.link/ipfs
+      - key: SPACE_DID
+        sync: false  # Set manually in Render dashboard

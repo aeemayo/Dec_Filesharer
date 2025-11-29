@@ -288,3 +288,58 @@ func (h *Handler) CreateDelegation(c *gin.Context) {
 
 	c.Data(http.StatusOK, "application/octet-stream", delegation)
 }
+
+// RegisterFileRequest is the request body for registering a file uploaded from frontend
+type RegisterFileRequest struct {
+	Name        string `json:"name" binding:"required"`
+	Size        int64  `json:"size" binding:"required"`
+	ContentType string `json:"contentType"`
+	CID         string `json:"cid" binding:"required"`
+}
+
+// RegisterFile registers a file that was uploaded directly from frontend to Storacha
+func (h *Handler) RegisterFile(c *gin.Context) {
+	var req RegisterFileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	// Validate CID format
+	if !isValidCID(req.CID) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid CID format"})
+		return
+	}
+
+	// Create file metadata
+	metadata := &FileMetadata{
+		ID:          GenerateID(),
+		Name:        req.Name,
+		Size:        req.Size,
+		ContentType: req.ContentType,
+		CID:         req.CID,
+		UploadedAt:  time.Now(),
+		GatewayURL:  h.storage.GetGatewayURL(req.CID),
+	}
+
+	// Save metadata
+	if err := h.fileRepo.SaveFile(metadata); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file metadata"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"file":    metadata,
+		"message": "File registered successfully",
+	})
+}
+
+// isValidCID checks if a string looks like a valid CID
+func isValidCID(cid string) bool {
+	// Basic validation - CIDs typically start with "bafy" or "bafk" for CIDv1
+	// or "Qm" for CIDv0
+	if len(cid) < 10 {
+		return false
+	}
+	return len(cid) > 0 && (cid[:4] == "bafy" || cid[:4] == "bafk" || cid[:2] == "Qm")
+}

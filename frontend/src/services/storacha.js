@@ -9,7 +9,10 @@
 // import * as Client from '@storacha/client'
 // import * as Delegation from '@storacha/client/delegation'
 
-const API_BASE = '/api'
+// Use environment variable for API URL, fallback to /api for local dev
+const API_BASE = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : '/api'
 
 /**
  * StorachaService handles interactions with Storacha network

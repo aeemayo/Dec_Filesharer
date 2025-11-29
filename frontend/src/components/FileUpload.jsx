@@ -3,6 +3,8 @@ import { useDropzone } from 'react-dropzone'
 import { FiUploadCloud, FiFile, FiX } from 'react-icons/fi'
 import './FileUpload.css'
 
+const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api'
+
 function FileUpload({ onUploadComplete }) {
   const [files, setFiles] = useState([])
   const [uploading, setUploading] = useState(false)
@@ -55,7 +57,7 @@ function FileUpload({ onUploadComplete }) {
     })
 
     try {
-      const response = await fetch('/api/upload', {
+      const response = await fetch(`${API_BASE}/upload`, {
         method: 'POST',
         body: formData,
       })
