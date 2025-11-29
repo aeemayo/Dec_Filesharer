@@ -31,7 +31,7 @@ func main() {
 
 	// CORS configuration for React frontend
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173", "http://localhost:3000", "https://*.vercel.app"},
+		AllowOrigins:     []string{"http://localhost:5173", "http://localhost:3000", "https://*dec-filesharer.vercel.app"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
