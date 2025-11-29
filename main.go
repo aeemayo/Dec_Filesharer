@@ -11,6 +11,11 @@ import (
 )
 
 func main() {
+	// Set Gin to release mode in production
+	if os.Getenv("GIN_MODE") == "" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	// Initialize configuration
 	cfg := LoadConfig()
 
