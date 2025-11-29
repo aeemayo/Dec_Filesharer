@@ -135,6 +135,27 @@
   transition: width 0.3s ease;
 }
 
+.upload-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 0.5rem;
+  background: rgba(233, 69, 96, 0.1);
+  border-radius: 6px;
+}
+
+.upload-status .status-icon {
+  color: #e94560;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 .btn-upload {
   width: 100%;
 }

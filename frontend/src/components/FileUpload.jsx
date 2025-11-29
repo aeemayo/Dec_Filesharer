@@ -1,14 +1,15 @@
 import { useCallback, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { FiUploadCloud, FiFile, FiX } from 'react-icons/fi'
+import { FiUploadCloud, FiFile, FiX, FiZap } from 'react-icons/fi'
+import storachaService from '../services/storacha'
 import './FileUpload.css'
-
-const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api'
 
 function FileUpload({ onUploadComplete }) {
   const [files, setFiles] = useState([])
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(0)
+  const [uploadStatus, setUploadStatus] = useState('')
+  const [uploadMethod, setUploadMethod] = useState('auto') // 'auto', 'direct', 'backend'
 
   const onDrop = useCallback((acceptedFiles) => {
     setFiles(prev => [
@@ -45,28 +46,41 @@ function FileUpload({ onUploadComplete }) {
     })
   }
 
+  const handleProgress = (event) => {
+    switch (event.type) {
+      case 'start':
+        setUploadStatus(`Uploading ${event.name}...`)
+        break
+      case 'shard':
+        setUploadStatus(`Storing chunk...`)
+        break
+      case 'fileComplete':
+        setProgress(((event.index + 1) / event.total) * 100)
+        setUploadStatus(`Uploaded ${event.index + 1}/${event.total}`)
+        break
+      case 'uploading':
+        setUploadStatus(event.method === 'backend' ? 'Uploading via server...' : 'Uploading to IPFS...')
+        break
+      case 'complete':
+        setProgress(100)
+        setUploadStatus('Upload complete!')
+        break
+      default:
+        break
+    }
+  }
+
   const uploadFiles = async () => {
     if (files.length === 0) return
 
     setUploading(true)
     setProgress(0)
-
-    const formData = new FormData()
-    files.forEach(({ file }) => {
-      formData.append('files', file)
-    })
+    setUploadStatus('Initializing...')
 
     try {
-      const response = await fetch(`${API_BASE}/upload`, {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (!response.ok) {
-        throw new Error('Upload failed')
-      }
-
-      const data = await response.json()
+      // Use storacha service for direct uploads
+      const fileList = files.map(f => f.file)
+      const data = await storachaService.uploadFiles(fileList, handleProgress)
       
       // Clean up previews
       files.forEach(({ preview }) => {
@@ -75,12 +89,14 @@ function FileUpload({ onUploadComplete }) {
       
       setFiles([])
       setProgress(100)
+      setUploadStatus('')
       
       if (onUploadComplete) {
         onUploadComplete(data.files)
       }
     } catch (error) {
       console.error('Upload error:', error)
+      setUploadStatus('')
       alert('Failed to upload files. Please try again.')
     } finally {
       setUploading(false)
@@ -146,19 +162,27 @@ function FileUpload({ onUploadComplete }) {
 
           <div className="upload-actions">
             {uploading && (
-              <div className="progress-bar">
-                <div 
-                  className="progress-fill" 
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
+              <>
+                <div className="progress-bar">
+                  <div 
+                    className="progress-fill" 
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                {uploadStatus && (
+                  <div className="upload-status">
+                    <FiZap className="status-icon" />
+                    {uploadStatus}
+                  </div>
+                )}
+              </>
             )}
             <button
               onClick={uploadFiles}
               disabled={uploading || files.length === 0}
               className="btn-upload"
             >
-              {uploading ? 'Uploading...' : `Upload ${files.length} file(s)`}
+              {uploading ? 'Uploading...' : `Upload ${files.length} file(s) to IPFS`}
             </button>
           </div>
         </div>

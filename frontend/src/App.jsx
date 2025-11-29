@@ -3,6 +3,7 @@ import FileUpload from './components/FileUpload'
 import FileList from './components/FileList'
 import FilePreview from './components/FilePreview'
 import ShareLinkManager from './components/ShareLinkManager'
+import StorachaLogin from './components/StorachaLogin'
 import './App.css'
 
 // API base URL - uses env variable in production, proxy in development
@@ -126,6 +127,7 @@ function App() {
 
       <main className="app-main">
         <section className="upload-section">
+          <StorachaLogin />
           <FileUpload onUploadComplete={handleUploadComplete} />
         </section>
 
