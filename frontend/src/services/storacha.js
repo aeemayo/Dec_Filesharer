@@ -3,15 +3,24 @@
  * 
  * This module integrates with the @storacha/client for direct browser-to-IPFS uploads
  * Files are uploaded directly to Storacha network, then registered with our backend.
+ * 
+ * Configuration via environment variables:
+ * - VITE_STORACHA_SPACE_DID: The DID of your Storacha space (did:key:...)
+ * - VITE_STORACHA_PROOF: Base64-encoded proof/delegation for the space
  */
 
 import * as Client from '@storacha/client'
 import * as Proof from '@storacha/client/proof'
+import { Signer } from '@storacha/client/principal/ed25519'
 
 // Use environment variable for API URL, fallback to /api for local dev
 const API_BASE = import.meta.env.VITE_API_URL 
   ? `${import.meta.env.VITE_API_URL}/api`
   : '/api'
+
+// Storacha space configuration from environment
+const STORACHA_SPACE_DID = import.meta.env.VITE_STORACHA_SPACE_DID
+const STORACHA_PROOF = import.meta.env.VITE_STORACHA_PROOF
 
 /**
  * StorachaService handles direct uploads to Storacha network
@@ -50,11 +59,29 @@ class StorachaService {
       // Create a new client (this creates a new agent)
       this.client = await Client.create()
       
-      // For browser-based uploads, we need to either:
-      // 1. Login via email (interactive)
-      // 2. Use a pre-configured space with delegation
+      // Priority 1: Check for pre-configured space via environment variables
+      if (STORACHA_SPACE_DID && STORACHA_PROOF) {
+        try {
+          console.log('Using configured Storacha space:', STORACHA_SPACE_DID)
+          
+          // Parse the base64-encoded proof
+          const proofBytes = Uint8Array.from(atob(STORACHA_PROOF), c => c.charCodeAt(0))
+          const proof = await Proof.parse(proofBytes)
+          
+          // Add the space with the proof
+          const space = await this.client.addSpace(proof)
+          await this.client.setCurrentSpace(space.did())
+          
+          this.initialized = true
+          console.log('Storacha client initialized with configured space')
+          return
+        } catch (e) {
+          console.error('Failed to use configured space:', e)
+          // Fall through to other methods
+        }
+      }
       
-      // Check if we already have a space from localStorage
+      // Priority 2: Check if we already have a space from localStorage
       const spaces = this.client.spaces()
       if (spaces.length > 0) {
         await this.client.setCurrentSpace(spaces[0].did())
@@ -63,7 +90,7 @@ class StorachaService {
         return
       }
 
-      // Try to get delegation from backend if available
+      // Priority 3: Try to get delegation from backend if available
       try {
         const delegation = await this.fetchDelegationFromBackend()
         if (delegation) {
@@ -93,6 +120,20 @@ class StorachaService {
    */
   canUploadDirectly() {
     return this.client && this.client.currentSpace()
+  }
+
+  /**
+   * Get the current space DID
+   */
+  getCurrentSpaceDid() {
+    return this.client?.currentSpace()?.did() || null
+  }
+
+  /**
+   * Check if using a pre-configured space
+   */
+  isUsingConfiguredSpace() {
+    return !!(STORACHA_SPACE_DID && STORACHA_PROOF)
   }
 
   /**

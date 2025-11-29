@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
-import { FiUser, FiCheck, FiLoader, FiMail, FiLogOut, FiCloud } from 'react-icons/fi'
+import { FiUser, FiCheck, FiLoader, FiMail, FiLogOut, FiCloud, FiSettings } from 'react-icons/fi'
 import storachaService from '../services/storacha'
 import './StorachaLogin.css'
 
 function StorachaLogin() {
   const [email, setEmail] = useState('')
-  const [status, setStatus] = useState('checking') // 'checking', 'disconnected', 'awaiting-verification', 'connected'
+  const [status, setStatus] = useState('checking') // 'checking', 'disconnected', 'awaiting-verification', 'connected', 'configured'
   const [isLoading, setIsLoading] = useState(false)
   const [spaceDid, setSpaceDid] = useState(null)
+  const [isConfigured, setIsConfigured] = useState(false)
 
   useEffect(() => {
     checkConnection()
@@ -17,11 +18,14 @@ function StorachaLogin() {
     setStatus('checking')
     try {
       await storachaService.initialize()
+      const configured = storachaService.isUsingConfiguredSpace()
+      setIsConfigured(configured)
+      
       if (storachaService.canUploadDirectly()) {
-        setStatus('connected')
-        const space = storachaService.client?.currentSpace()
-        if (space) {
-          setSpaceDid(space.did())
+        setStatus(configured ? 'configured' : 'connected')
+        const did = storachaService.getCurrentSpaceDid()
+        if (did) {
+          setSpaceDid(did)
         }
       } else {
         setStatus('disconnected')
@@ -43,9 +47,9 @@ function StorachaLogin() {
       const success = await storachaService.loginWithEmail(email)
       if (success) {
         setStatus('connected')
-        const space = storachaService.client?.currentSpace()
-        if (space) {
-          setSpaceDid(space.did())
+        const did = storachaService.getCurrentSpaceDid()
+        if (did) {
+          setSpaceDid(did)
         }
       } else {
         setStatus('disconnected')
@@ -69,6 +73,26 @@ function StorachaLogin() {
         <div className="login-status checking">
           <FiLoader className="spin" />
           <span>Checking connection...</span>
+        </div>
+      </div>
+    )
+  }
+
+  // Pre-configured space via environment variables
+  if (status === 'configured') {
+    return (
+      <div className="storacha-login card">
+        <div className="login-status configured">
+          <FiSettings className="status-icon configured" />
+          <div className="connection-info">
+            <span className="status-text">Pre-configured Space</span>
+            {spaceDid && (
+              <span className="space-did" title={spaceDid}>
+                Space: {truncateDid(spaceDid)}
+              </span>
+            )}
+          </div>
+          <span className="badge badge-configured">Direct IPFS Upload</span>
         </div>
       </div>
     )

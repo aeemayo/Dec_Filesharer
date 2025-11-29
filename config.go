@@ -1,21 +1,16 @@
 package main
 
 import (
-	"log"
 	"os"
 	"time"
 )
 
 // Config holds application configuration
 type Config struct {
-	// Storacha/UCAN configuration
-	PrivateKeyPath string
-	ProofPath      string
-	SpaceDID       string
-
-	// Private key and proof contents (loaded from files)
-	PrivateKey []byte
-	Proof      []byte
+	// Storacha/UCAN configuration - values directly from env vars
+	PrivateKey string
+	Proof      string
+	SpaceDID   string
 
 	// Application settings
 	DefaultExpiration time.Duration
@@ -26,12 +21,12 @@ type Config struct {
 	IPFSGateway string
 }
 
-// LoadConfig loads configuration from environment variables and files
+// LoadConfig loads configuration from environment variables
 func LoadConfig() *Config {
 	cfg := &Config{
-		PrivateKeyPath:    getEnv("PRIVATE_KEY_PATH", "./private.key"),
-		ProofPath:         getEnv("PROOF_PATH", "./proof.ucan"),
-		SpaceDID:          getEnv("SPACE_DID", ""),
+		PrivateKey:        getEnv("STORACHA_PRIVATE_KEY", ""),
+		Proof:             getEnv("STORACHA_PROOF", ""),
+		SpaceDID:          getEnv("STORACHA_SPACE_DID", ""),
 		DefaultExpiration: 24 * time.Hour,
 		MaxFileSize:       100 * 1024 * 1024, // 100MB default
 		AllowedFileTypes: []string{
@@ -42,30 +37,6 @@ func LoadConfig() *Config {
 			"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 		},
 		IPFSGateway: getEnv("IPFS_GATEWAY", "https://w3s.link/ipfs"),
-	}
-
-	// Load private key if file exists
-	if _, err := os.Stat(cfg.PrivateKeyPath); err == nil {
-		key, err := os.ReadFile(cfg.PrivateKeyPath)
-		if err != nil {
-			log.Printf("Warning: Could not read private key: %v", err)
-		} else {
-			cfg.PrivateKey = key
-		}
-	} else {
-		log.Printf("Warning: Private key file not found at %s", cfg.PrivateKeyPath)
-	}
-
-	// Load proof if file exists
-	if _, err := os.Stat(cfg.ProofPath); err == nil {
-		proof, err := os.ReadFile(cfg.ProofPath)
-		if err != nil {
-			log.Printf("Warning: Could not read proof: %v", err)
-		} else {
-			cfg.Proof = proof
-		}
-	} else {
-		log.Printf("Warning: Proof file not found at %s", cfg.ProofPath)
 	}
 
 	return cfg
