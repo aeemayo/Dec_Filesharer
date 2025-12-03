@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 import FileUpload from './components/FileUpload'
 import FileList from './components/FileList'
 import FilePreview from './components/FilePreview'
@@ -176,6 +177,7 @@ function App() {
       <footer className="app-footer">
         <p>Powered by Storacha Network & IPFS • UCAN-based authorization</p>
       </footer>
+      <Analytics />
     </div>
   )
 }
